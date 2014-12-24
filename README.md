@@ -1,4 +1,4 @@
 Redstone
 ========
 
-Node Control System for Minestak
+Node Control System for Minestack

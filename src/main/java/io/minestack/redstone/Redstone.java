@@ -2,7 +2,10 @@ package io.minestack.redstone;
 
 import com.mongodb.ServerAddress;
 import io.minestack.doublechest.DoubleChest;
-import io.minestack.redstone.threads.ServerManager;
+import io.minestack.redstone.managers.BungeeManager;
+import io.minestack.redstone.managers.ServerManager;
+import io.minestack.redstone.threads.ProvisionThread;
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 import java.net.UnknownHostException;
@@ -15,6 +18,12 @@ public class Redstone {
     public static void main(String[] args) {
         new Redstone();
     }
+
+    @Getter
+    private final ServerManager serverManager;
+
+    @Getter
+    private final BungeeManager bungeeManager;
 
     public Redstone() {
         log.info("Started Redstone - Minestack Controller");
@@ -40,8 +49,11 @@ public class Redstone {
             DoubleChest.INSTANCE.initMongoDatabase(addresses, System.getenv("mongo_username"), System.getenv("mongo_password"), System.getenv("mongo_database"));
         }
 
-        ServerManager serverManager = new ServerManager();
-        serverManager.start();
+        serverManager = new ServerManager();
+        bungeeManager = new BungeeManager();
+
+        ProvisionThread provisionThread = new ProvisionThread(this);
+        provisionThread.start();
     }
 
 }

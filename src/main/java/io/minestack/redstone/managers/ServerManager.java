@@ -21,13 +21,13 @@ import java.util.Date;
 @Log4j2
 public class ServerManager {
 
-    public void createServer(Network network, ServerType serverType) {
+    public boolean createServer(Network network, ServerType serverType) {
         log.info("Creating Server " + serverType.getName() + " for network " + network.getName());
         Node node = network.findNodeForServer(serverType);
 
         if (node == null) {
             log.error("Could not find a node to place " + serverType.getName() + " for network " + network.getName() + " on. Is the network over provisioned?");
-            return;
+            return false;
         }
 
         log.info("Placing Server " + serverType.getName() + " on node " + node.getName() + " for network " + network.getName());
@@ -48,13 +48,13 @@ public class ServerManager {
             removeContainer(server);
         } catch (Exception e) {
             log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);
-            return;
+            return false;
         }
 
-            log.info("Setting up Docker Container for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
+        log.info("Setting up Docker Container for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
 
         DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + server.getNode().getPrivateAddress() + ":4243").build();
-        CreateContainerResponse response = null;
+        CreateContainerResponse response;
 
         try {
             CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bukkit")
@@ -71,26 +71,23 @@ public class ServerManager {
                     .exec();
         } catch (Exception e) {
             log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);
-        }
-
-        if (response == null) {
-            log.error("Null docker response for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
-            return;
+            return false;
         }
 
         String containerId = response.getId();
 
         log.info("Starting Docker Container for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
-
         try {
             dockerClient.startContainerCmd(containerId).withPublishAllPorts(true).withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
             log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);
+            return false;
         }
+
+        return true;
     }
 
     public void removeContainer(Server server) throws Exception {
-
         DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + server.getNode().getPrivateAddress() + ":4243").build();
 
         for (Container container : dockerClient.listContainersCmd().withShowAll(true).exec()) {
@@ -105,7 +102,6 @@ public class ServerManager {
                 break;
             }
         }
-
     }
 
 }

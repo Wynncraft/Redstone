@@ -20,12 +20,12 @@ import java.util.Date;
 @Log4j2
 public class BungeeManager {
 
-    public void createBungee(Network network, BungeeType bungeeType, Node node, NodePublicAddress nodePublicAddress) {
+    public boolean createBungee(Network network, BungeeType bungeeType, Node node, NodePublicAddress nodePublicAddress) {
         log.info("Creating Bungee " + bungeeType.getName() + " for network " + network.getName() + " on node "+node.getName());
 
         if (node.canFitBungee(bungeeType) == false) {
             log.error("Cannot fit bungee type "+bungeeType.getName()+" for network "+network.getName()+" on node "+node.getName());
-            return;
+            return false;
         }
 
         Bungee bungee = new Bungee(new ObjectId(), new Date(System.currentTimeMillis()));
@@ -42,13 +42,13 @@ public class BungeeManager {
             removeContainer(bungee);
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createServer, full stack trace follows: ", e);
-            return;
+            return false;
         }
 
         log.info("Setting up Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress() + " for network " + network.getName() + " on node "+node.getName());
 
         DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + bungee.getNode().getPrivateAddress() + ":4243").build();
-        CreateContainerResponse response = null;
+        CreateContainerResponse response;
 
         try {
             CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bungee")
@@ -66,23 +66,20 @@ public class BungeeManager {
                     .exec();
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);
-        }
-
-        if (response == null) {
-            log.error("Null docker response for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress()  + " for network " + network.getName() + " on node "+node.getName());
-            return;
+            return false;
         }
 
         String containerId = response.getId();
 
         log.info("Starting Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress()+ " for network " + network.getName()+ " on node "+node.getName());
-
         try {
             dockerClient.startContainerCmd(containerId).withPortBindings(new Ports(new ExposedPort(25562, InternetProtocol.TCP), new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565)))
                     .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);
+            return false;
         }
+        return true;
     }
 
     public void removeContainer(Bungee bungee) {

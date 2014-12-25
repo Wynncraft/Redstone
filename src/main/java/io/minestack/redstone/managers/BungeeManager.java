@@ -59,7 +59,10 @@ public class BungeeManager {
 
         try {
             CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bungee")
-                    .withEnv("mongo_addresses=" + System.getenv("mongo_addresses"));
+                    .withEnv("mongo_addresses=" + System.getenv("mongo_addresses"))
+                    .withEnv("rabbit_addresses="+System.getenv("rabbit_addresses"))
+                    .withEnv("rabbit_username=" + System.getenv("rabbit_username"))
+                    .withEnv("rabbit_password="+System.getenv("rabbit_password"));
 
             if (System.getenv("mongo_username") != null) {
                 cmd.withEnv("mongo_username=" + System.getenv("mongo_username"))

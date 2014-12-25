@@ -33,7 +33,8 @@ public class ServerManager {
         log.info("Placing Server " + serverType.getName() + " on node " + node.getName() + " for network " + network.getName());
         int number = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNextNumber(network, serverType);
 
-        Server server = new Server(new ObjectId(), new Date(System.currentTimeMillis()));
+        ObjectId objectId = new ObjectId();
+        Server server = new Server(objectId, new Date(System.currentTimeMillis()));
         server.setNetwork(network);
         server.setNode(node);
         server.setNumber(number);
@@ -58,7 +59,10 @@ public class ServerManager {
 
         try {
             CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bukkit")
-                    .withEnv("mongo_addresses=" + System.getenv("mongo_addresses"));
+                    .withEnv("mongo_addresses=" + System.getenv("mongo_addresses"))
+                    .withEnv("rabbit_addresses="+System.getenv("rabbit_addresses"))
+                    .withEnv("rabbit_username="+System.getenv("rabbit_username"))
+                    .withEnv("rabbit_password="+System.getenv("rabbit_password"));
 
             if (System.getenv("mongo_username") != null) {
                 cmd.withEnv("mongo_username=" + System.getenv("mongo_username"))
@@ -75,6 +79,10 @@ public class ServerManager {
         }
 
         String containerId = response.getId();
+        server = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getModel(objectId);
+        server.setContainerId(containerId);
+
+        DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().saveModel(server);
 
         log.info("Starting Docker Container for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
         try {

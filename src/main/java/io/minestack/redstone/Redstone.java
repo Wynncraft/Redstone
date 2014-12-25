@@ -1,6 +1,7 @@
 package io.minestack.redstone;
 
 import com.mongodb.ServerAddress;
+import com.rabbitmq.client.Address;
 import io.minestack.doublechest.DoubleChest;
 import io.minestack.redstone.managers.BungeeManager;
 import io.minestack.redstone.managers.ServerManager;
@@ -48,6 +49,19 @@ public class Redstone {
         } else {
             DoubleChest.INSTANCE.initMongoDatabase(addresses, System.getenv("mongo_username"), System.getenv("mongo_password"), System.getenv("mongo_database"));
         }
+
+        log.info("Init RabbitMQ");
+        List<Address> addressList = new ArrayList<>();
+        String rabbitAddresses = System.getenv("rabbit_addresses");
+        for (String rabbitAddress : rabbitAddresses.split(",")) {
+            String[] split = rabbitAddress.split(":");
+            int port = 5672;
+            if (split.length == 2) {
+                port = Integer.parseInt(split[1]);
+            }
+            addressList.add(new Address(split[0], port));
+        }
+        DoubleChest.INSTANCE.initRabbitMQDatabase(addressList, System.getenv("rabbit_username"), System.getenv("rabbit_password"));
 
         serverManager = new ServerManager();
         bungeeManager = new BungeeManager();

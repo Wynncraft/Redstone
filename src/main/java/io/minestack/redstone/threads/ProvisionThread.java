@@ -160,12 +160,6 @@ public class ProvisionThread extends Thread {
 
                     if (servers.size() < networkServerType.getAmount()) {
                         int diff = networkServerType.getAmount() - servers.size();
-                        WorkerPublisher serverPublisher = null;
-                        try {
-                            serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "serverBuild");
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
                         for (int i = 0; i < diff; i++) {
                             JSONObject message = new JSONObject();
 
@@ -173,9 +167,8 @@ public class ProvisionThread extends Thread {
                             message.put("serverType", networkServerType.getServerType().getId().toString());
 
                             try {
-                                if (serverPublisher != null) {
-                                    serverPublisher.publish(message);
-                                }
+                                WorkerPublisher serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "serverBuild");
+                                serverPublisher.publish(message);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }

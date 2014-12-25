@@ -37,7 +37,7 @@ public class BungeeManager {
 
         DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().insertModel(bungee);
 
-        log.info("Removing any old Docker Containers for" + bungeeType.getName() + "."+nodePublicAddress.getPublicAddress()+" for network " + network.getName() + " on node "+node.getName());
+        log.info("Removing any old Docker Containers for " + bungeeType.getName() + "."+nodePublicAddress.getPublicAddress()+" for network " + network.getName() + " on node "+node.getName());
         try {
             removeContainer(bungee);
         } catch (Exception e) {
@@ -47,7 +47,7 @@ public class BungeeManager {
 
         log.info("Setting up Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress() + " for network " + network.getName() + " on node "+node.getName());
 
-        DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + bungee.getNode().getPrivateAddress() + ":4443").build();
+        DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + bungee.getNode().getPrivateAddress() + ":4243").build();
         CreateContainerResponse response = null;
 
         try {

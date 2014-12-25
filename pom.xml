@@ -54,11 +54,40 @@
                                     <include>org.apache.logging.log4j:log4j-core:*</include>
                                     <!-- Docker-Java -->
                                     <include>com.github.docker-java:docker-java:*</include>
+                                    <include>com.fasterxml.jackson.core:*</include>
+                                    <include>com.fasterxml.jackson.jaxrs:*</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-jaxb-annotations:*</include>
+                                    <include>com.github.jnr:*</include>
+                                    <include>com.google.guava:guava:*</include>
+                                    <include>commons-codec:commons-codec:*</include>
+                                    <include>commons-io:commons-io:*</include>
+                                    <include>commons-lang:commons-lang:*</include>
+                                    <include>javax.annotation:javax.annotation-api:*</include>
+                                    <include>javax.ws.rs:javax.ws.rs-api:*</include>
+                                    <include>org.apache.commons:commons-compress:*</include>
+                                    <include>org.eclipse.jetty:*</include>
+                                    <include>org.glassfish.hk2.external:*</include>
+                                    <include>org.glassfish.hk2:*</include>
+                                    <include>org.glassfish.jersey.bundles.repackaged:jersey-guava:*</include>
+                                    <include>org.glassfish.jersey.connectors:jersey-jetty-connector:*</include>
+                                    <include>org.glassfish.jersey.core:*</include>
+                                    <include>org.slf4j:*</include>
+                                    <include>org.bouncycastle:*</include>
                                     <!-- Double Chest-->
                                     <include>io.minestack:DoubleChest:*</include>
                                     <include>mysql:mysql-connector-java:*</include>
                                 </includes>
                             </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>

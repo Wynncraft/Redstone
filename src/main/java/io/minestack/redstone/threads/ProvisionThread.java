@@ -3,8 +3,8 @@ package io.minestack.redstone.threads;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Envelope;
 import io.minestack.doublechest.DoubleChest;
-import io.minestack.doublechest.databases.rabbitmq.Publisher;
-import io.minestack.doublechest.databases.rabbitmq.WorkerQueue;
+import io.minestack.doublechest.databases.rabbitmq.worker.WorkerPublisher;
+import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueue;
 import io.minestack.doublechest.model.bungee.Bungee;
 import io.minestack.doublechest.model.network.Network;
 import io.minestack.doublechest.model.node.NetworkNode;
@@ -99,38 +99,43 @@ public class ProvisionThread extends Thread {
                     }
 
                     Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeBungee(network, networkNode.getNode());
+                    WorkerPublisher bungeePublisher = null;
                     try {
-                        Publisher bungeePublisher = new Publisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "bungeeBuild");
-                        boolean publish = false;
-                        if (runningBungee != null) {
-                            if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() + 30000) {
-                                //bungee hasn't updated is 30 seconds. probably dead
-                                try {
-                                    redstone.getBungeeManager().removeContainer(runningBungee);
-                                    DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(runningBungee);
-                                    //redstone.getBungeeManager().createBungee(network, networkNode.getBungeeType(), networkNode.getNode(), networkNode.getNodePublicAddress());
-                                    publish = true;
-                                } catch (Exception e) {
-                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
-                                }
-                            }
-                        } else {
-                            //redstone.getBungeeManager().createBungee(network, networkNode.getBungeeType(), networkNode.getNode(), networkNode.getNodePublicAddress());
-                            publish = true;
-                        }
-
-                        if (publish == true) {
-                            JSONObject message = new JSONObject();
-
-                            message.put("network", network.getId().toString());
-                            message.put("bungeeType", networkNode.getBungeeType().getId().toString());
-                            message.put("node", networkNode.getNode().getId().toString());
-                            message.put("publicAddress", networkNode.getNodePublicAddress());
-
-                            bungeePublisher.publish(message);
-                        }
+                        bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "bungeeBuild");
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                    }
+                    boolean publish = false;
+                    if (runningBungee != null) {
+                        if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() + 30000) {
+                            //bungee hasn't updated is 30 seconds. probably dead
+                            try {
+                                redstone.getBungeeManager().removeContainer(runningBungee);
+                                DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(runningBungee);
+                                publish = true;
+                            } catch (Exception e) {
+                                log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                            }
+                        }
+                    } else {
+                        publish = true;
+                    }
+
+                    if (publish == true) {
+                        JSONObject message = new JSONObject();
+
+                        message.put("network", network.getId().toString());
+                        message.put("bungeeType", networkNode.getBungeeType().getId().toString());
+                        message.put("node", networkNode.getNode().getId().toString());
+                        message.put("publicAddress", networkNode.getNodePublicAddress());
+
+                        try {
+                            if (bungeePublisher != null) {
+                                bungeePublisher.publish(message);
+                            }
+                        } catch (IOException e) {
+                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                        }
                     }
                 }
 
@@ -138,7 +143,7 @@ public class ProvisionThread extends Thread {
                 Iterator<Server> serverIterator = servers.iterator();
                 while (serverIterator.hasNext()) {
                     Server server = serverIterator.next();
-                    if (server.getUpdated_at().getTime() < System.currentTimeMillis()+30000) {
+                    if (server.getUpdated_at().getTime() < System.currentTimeMillis() + 30000) {
                         //server hasn't updated in 30 seconds. probably dead
                         try {
                             redstone.getServerManager().removeContainer(server);
@@ -155,20 +160,27 @@ public class ProvisionThread extends Thread {
 
                     if (servers.size() < networkServerType.getAmount()) {
                         int diff = networkServerType.getAmount() - servers.size();
+                        WorkerPublisher serverPublisher = null;
                         try {
-                            Publisher serverPublisher = new Publisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "serverBuild");
-                            for (int i = 0; i < diff; i++) {
-                                //redstone.getServerManager().createServer(network, networkServerType.getServerType());
-                                JSONObject message = new JSONObject();
-
-                                message.put("network", network.getId().toString());
-                                message.put("serverType", networkServerType.getServerType().getId().toString());
-
-                                serverPublisher.publish(message);
-                            }
+                            serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "serverBuild");
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
+                        for (int i = 0; i < diff; i++) {
+                            JSONObject message = new JSONObject();
+
+                            message.put("network", network.getId().toString());
+                            message.put("serverType", networkServerType.getServerType().getId().toString());
+
+                            try {
+                                if (serverPublisher != null) {
+                                    serverPublisher.publish(message);
+                                }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
                     }
                 }
             }

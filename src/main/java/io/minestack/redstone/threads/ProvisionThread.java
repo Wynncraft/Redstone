@@ -5,6 +5,7 @@ import com.rabbitmq.client.Envelope;
 import io.minestack.doublechest.DoubleChest;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerPublisher;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueue;
+import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueues;
 import io.minestack.doublechest.model.bungee.Bungee;
 import io.minestack.doublechest.model.network.Network;
 import io.minestack.doublechest.model.node.NetworkNode;
@@ -34,7 +35,7 @@ public class ProvisionThread extends Thread {
         this.redstone = redstone;
 
         try {
-            serverWorkerQueue = new WorkerQueue(DoubleChest.INSTANCE.getRabbitMQDatabase(), "serverBuild") {
+            serverWorkerQueue = new WorkerQueue(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.SERVER_BUILD.name()) {
                 @Override
                 public void messageDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties basicProperties, byte[] bytes) throws IOException {
                     JSONObject jsonObject = new JSONObject(new String(bytes));
@@ -60,7 +61,7 @@ public class ProvisionThread extends Thread {
         }
 
         try {
-            bungeeWorkerQueue = new WorkerQueue(DoubleChest.INSTANCE.getRabbitMQDatabase(), "bungeeBuild") {
+            bungeeWorkerQueue = new WorkerQueue(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name()) {
                 @Override
                 public void messageDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties basicProperties, byte[] bytes) throws IOException {
                     JSONObject jsonObject = new JSONObject(new String(bytes));
@@ -101,7 +102,7 @@ public class ProvisionThread extends Thread {
                     Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeBungee(network, networkNode.getNode());
                     WorkerPublisher bungeePublisher = null;
                     try {
-                        bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "bungeeBuild");
+                        bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name());
                     } catch (IOException e) {
                         log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                     }
@@ -167,7 +168,7 @@ public class ProvisionThread extends Thread {
                             message.put("serverType", networkServerType.getServerType().getId().toString());
 
                             try {
-                                WorkerPublisher serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), "serverBuild");
+                                WorkerPublisher serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.SERVER_BUILD.name());
                                 serverPublisher.publish(message);
                             } catch (IOException e) {
                                 e.printStackTrace();

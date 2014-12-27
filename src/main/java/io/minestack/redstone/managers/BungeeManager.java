@@ -1,7 +1,6 @@
 package io.minestack.redstone.managers;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DockerClientBuilder;
@@ -14,8 +13,10 @@ import io.minestack.doublechest.model.pluginhandler.bungeetype.BungeeType;
 import lombok.extern.log4j.Log4j2;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 @Log4j2
 public class BungeeManager {
@@ -58,18 +59,21 @@ public class BungeeManager {
         CreateContainerResponse response;
 
         try {
-            CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bungee")
-                    .withEnv("mongo_addresses=" + System.getenv("mongo_addresses"))
-                    .withEnv("rabbit_addresses="+System.getenv("rabbit_addresses"))
-                    .withEnv("rabbit_username=" + System.getenv("rabbit_username"))
-                    .withEnv("rabbit_password="+System.getenv("rabbit_password"));
+            List<String> env = new ArrayList<>();
+            env.add("mongo_addresses=" + System.getenv("mongo_addresses"));
+            env.add("mongo_database=" + System.getenv("mongo_database"));
+            env.add("rabbit_addresses=" + System.getenv("rabbit_addresses"));
+            env.add("rabbit_username="+System.getenv("rabbit_username"));
+            env.add("rabbit_password="+System.getenv("rabbit_password"));
+            env.add("bungee_id=" + bungee.getId());
 
             if (System.getenv("mongo_username") != null) {
-                cmd.withEnv("mongo_username=" + System.getenv("mongo_username"))
-                        .withEnv("mongo_password=" + System.getenv("mongo_password"));
+                env.add("mongo_username=" + System.getenv("mongo_username"));
+                env.add("mongo_password=" + System.getenv("mongo_password"));
             }
 
-            response = cmd.withEnv("bungee_id=" + bungee.getId())
+            response = dockerClient.createContainerCmd("minestack/bungee")
+                    .withEnv(env.toArray(new String[env.size()]))
                     .withExposedPorts(new ExposedPort(25565, InternetProtocol.TCP))
                     .withName(bungeeType.getName() + "." + nodePublicAddress.getPublicAddress())
                     .withStdinOpen(true)
@@ -80,6 +84,8 @@ public class BungeeManager {
         }
 
         String containerId = response.getId();
+        bungee.setContainerId(containerId);
+        DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().saveModel(bungee);
 
         log.info("Starting Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress()+ " for network " + network.getName()+ " on node "+node.getName());
         try {

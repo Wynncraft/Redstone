@@ -1,50 +1,60 @@
 package io.minestack.redstone.managers;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Container;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
 import io.minestack.doublechest.DoubleChest;
-import io.minestack.doublechest.model.network.Network;
 import io.minestack.doublechest.model.node.Node;
-import io.minestack.doublechest.model.pluginhandler.servertype.ServerType;
 import io.minestack.doublechest.model.server.Server;
 import lombok.extern.log4j.Log4j2;
-import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 @Log4j2
 public class ServerManager {
 
-    public boolean createServer(Network network, ServerType serverType) {
-        log.info("Creating Server " + serverType.getName() + " for network " + network.getName());
-        Node node = network.findNodeForServer(serverType);
-
-        if (node == null) {
-            log.error("Could not find a node to place " + serverType.getName() + " for network " + network.getName() + " on. Is the network over provisioned?");
+    public boolean createServer(Server server) {
+        if (server.getNode() != null) {
+            log.error("Tried to create a already running server.");
+            return false;
+        }
+        if (server.getNetwork() == null) {
+            log.error("Tried to create a server with a null network.");
+            return false;
+        }
+        if (server.getServerType() == null) {
+            log.error("Tried to create a server with a null server type.");
+            return false;
+        }
+        if (server.getNetwork().getServerTypes().containsKey(server.getServerType().getId()) == false) {
+            log.error("Tried to create "+server.getServerType().getName()+" on network "+server.getNetwork().getName()+" when it has not been added.");
+            return false;
+        }
+        if (DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(server.getNetwork()).size() > server.getNetwork().getServerTypes().get(server.getServerType().getId()).getAmount()) {
+            log.error("Tried to create more servers then provisioned on network "+server.getNetwork().getName());
             return false;
         }
 
-        log.info("Placing Server " + serverType.getName() + " on node " + node.getName() + " for network " + network.getName());
-        int number = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNextNumber(network, serverType);
-
-        ObjectId objectId = new ObjectId();
-        Server server = new Server(objectId, new Date(System.currentTimeMillis()));
-        server.setNetwork(network);
-        server.setNode(node);
+        int number = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNextNumber(server.getNetwork(), server.getServerType());
         server.setNumber(number);
-        server.setServerType(serverType);
-        server.setPort(-1);
-        server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
 
-        DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().insertModel(server);
+        log.info("Creating Server " + server.getServerType().getName() + " for network " + server.getNetwork().getName());
+        Node node = server.getNetwork().findNodeForServer(server.getServerType());
 
-        log.info("Removing any old Docker Containers for " + serverType.getName() + ". " + server.getNumber() + " for network " + network.getName());
+        if (node == null) {
+            log.error("Could not find a node to place " + server.getServerType().getName() + " for network " + server.getNetwork().getName() + " on. Is the network over provisioned?");
+            return false;
+        }
+        server.setNode(node);
+
+        log.info("Placing Server " + server.getServerType().getName() + " on node " + node.getName() + " for network " + server.getNetwork().getName());
+        log.info("Removing any old Docker Containers for " + server.getServerType().getName() + "." + server.getNumber() + " for network " + server.getNetwork().getName());
         try {
             removeContainer(server);
         } catch (Exception e) {
@@ -52,25 +62,28 @@ public class ServerManager {
             return false;
         }
 
-        log.info("Setting up Docker Container for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
+        log.info("Setting up Docker Container for " + server.getServerType().getName() + "." + server.getNumber() + " for network " + server.getNetwork().getName());
 
         DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + server.getNode().getPrivateAddress() + ":4243").build();
         CreateContainerResponse response;
 
         try {
-            CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bukkit")
-                    .withEnv("mongo_addresses=" + System.getenv("mongo_addresses"))
-                    .withEnv("rabbit_addresses="+System.getenv("rabbit_addresses"))
-                    .withEnv("rabbit_username="+System.getenv("rabbit_username"))
-                    .withEnv("rabbit_password="+System.getenv("rabbit_password"));
+            List<String> env = new ArrayList<>();
+            env.add("mongo_addresses=" + System.getenv("mongo_addresses"));
+            env.add("mongo_database=" + System.getenv("mongo_database"));
+            env.add("rabbit_addresses=" + System.getenv("rabbit_addresses"));
+            env.add("rabbit_username="+System.getenv("rabbit_username"));
+            env.add("rabbit_password="+System.getenv("rabbit_password"));
+            env.add("server_id="+server.getId());
 
             if (System.getenv("mongo_username") != null) {
-                cmd.withEnv("mongo_username=" + System.getenv("mongo_username"))
-                        .withEnv("mongo_password=" + System.getenv("mongo_password"));
+                env.add("mongo_username=" + System.getenv("mongo_username"));
+                env.add("mongo_password=" + System.getenv("mongo_password"));
             }
 
-            response = cmd.withEnv("server_id=" + server.getId())
-                    .withName(serverType.getName() + "." + server.getNumber())
+            response = dockerClient.createContainerCmd("minestack/bukkit")
+                    .withEnv(env.toArray(new String[env.size()]))
+                    .withName(server.getServerType().getName() + "." + server.getNumber())
                     .withStdinOpen(true)
                     .exec();
         } catch (Exception e) {
@@ -79,12 +92,11 @@ public class ServerManager {
         }
 
         String containerId = response.getId();
-        server = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getModel(objectId);
         server.setContainerId(containerId);
-
+        server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
         DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().saveModel(server);
 
-        log.info("Starting Docker Container for " + serverType.getName() + "." + server.getNumber() + " for network " + network.getName());
+        log.info("Starting Docker Container for " + server.getServerType().getName() + "." + server.getNumber() + " for network " + server.getNetwork().getName());
         try {
             dockerClient.startContainerCmd(containerId).withPublishAllPorts(true).withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {

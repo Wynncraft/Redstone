@@ -13,7 +13,6 @@ import io.minestack.doublechest.model.node.Node;
 import io.minestack.doublechest.model.node.NodePublicAddress;
 import io.minestack.doublechest.model.pluginhandler.bungeetype.BungeeType;
 import io.minestack.doublechest.model.pluginhandler.servertype.NetworkServerType;
-import io.minestack.doublechest.model.pluginhandler.servertype.ServerType;
 import io.minestack.doublechest.model.server.Server;
 import io.minestack.redstone.Redstone;
 import lombok.extern.log4j.Log4j2;
@@ -21,6 +20,8 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -36,17 +37,27 @@ public class ProvisionThread extends Thread {
 
         try {
             serverWorkerQueue = new WorkerQueue(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.SERVER_BUILD.name()) {
+
+                ArrayList<ObjectId> creatingServers = new ArrayList<>();
+
                 @Override
                 public void messageDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties basicProperties, byte[] bytes) throws IOException {
                     JSONObject jsonObject = new JSONObject(new String(bytes));
 
-                    Network network = DoubleChest.INSTANCE.getMongoDatabase().getNetworkRepository().getModel(new ObjectId(jsonObject.getString("network")));
-                    ServerType serverType = DoubleChest.INSTANCE.getMongoDatabase().getServerTypeRepository().getModel(new ObjectId(jsonObject.getString("serverType")));
+                    ObjectId objectId = new ObjectId(jsonObject.getString("server"));
 
+                    if (creatingServers.contains(objectId)) {
+                        log.warn("Already creating the server with the objectId of "+objectId.toString());
+                        getChannel().basicNack(envelope.getDeliveryTag(), false, false);
+                        return;
+                    }
+
+                    creatingServers.add(objectId);
+                    Server server = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getModel(objectId);
                     boolean success = false;
 
-                    if (network != null && serverType != null) {
-                        success = redstone.getServerManager().createServer(network, serverType);
+                    if (server != null) {
+                        success = redstone.getServerManager().createServer(server);
                     }
 
                     if (success == true) {
@@ -54,6 +65,7 @@ public class ProvisionThread extends Thread {
                     } else {
                         getChannel().basicNack(envelope.getDeliveryTag(), false, false);
                     }
+                    creatingServers.remove(objectId);
                 }
             };
         } catch (IOException e) {
@@ -133,6 +145,7 @@ public class ProvisionThread extends Thread {
                         try {
                             if (bungeePublisher != null) {
                                 bungeePublisher.publish(message);
+                                bungeePublisher.close();
                             }
                         } catch (IOException e) {
                             log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
@@ -144,10 +157,12 @@ public class ProvisionThread extends Thread {
                 Iterator<Server> serverIterator = servers.iterator();
                 while (serverIterator.hasNext()) {
                     Server server = serverIterator.next();
-                    if (server.getUpdated_at().getTime() < System.currentTimeMillis() + 30000) {
+                    if (server.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
                         //server hasn't updated in 30 seconds. probably dead
                         try {
-                            redstone.getServerManager().removeContainer(server);
+                            if (server.getNode() != null) {
+                                redstone.getServerManager().removeContainer(server);
+                            }
                             DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().removeModel(server);
                             serverIterator.remove();
                         } catch (Exception e) {
@@ -157,19 +172,27 @@ public class ProvisionThread extends Thread {
                 }
 
                 for (NetworkServerType networkServerType : network.getServerTypes().values()) {
+                    if (networkServerType.isManualStart() == true) {
+                        continue;
+                    }
                     servers = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServerTypeServers(network, networkServerType.getServerType());
 
                     if (servers.size() < networkServerType.getAmount()) {
                         int diff = networkServerType.getAmount() - servers.size();
                         for (int i = 0; i < diff; i++) {
-                            JSONObject message = new JSONObject();
+                            Server server = new Server(new ObjectId(), new Date(System.currentTimeMillis()));
+                            server.setNetwork(network);
+                            server.setServerType(networkServerType.getServerType());
+                            server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
+                            DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().insertModel(server);
 
-                            message.put("network", network.getId().toString());
-                            message.put("serverType", networkServerType.getServerType().getId().toString());
+                            JSONObject message = new JSONObject();
+                            message.put("server", server.getId().toString());
 
                             try {
                                 WorkerPublisher serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.SERVER_BUILD.name());
                                 serverPublisher.publish(message);
+                                serverPublisher.close();
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }

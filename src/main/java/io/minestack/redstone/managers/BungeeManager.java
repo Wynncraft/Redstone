@@ -1,6 +1,7 @@
 package io.minestack.redstone.managers;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DockerClientBuilder;
@@ -72,12 +73,15 @@ public class BungeeManager {
                 env.add("mongo_password=" + System.getenv("mongo_password"));
             }
 
-            response = dockerClient.createContainerCmd("minestack/bungee")
+            CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bungee")
                     .withEnv(env.toArray(new String[env.size()]))
-                    .withExposedPorts(new ExposedPort(25565, InternetProtocol.TCP))
                     .withName(bungeeType.getName() + "." + nodePublicAddress.getPublicAddress())
-                    .withStdinOpen(true)
-                    .exec();
+                    .withExposedPorts(new ExposedPort(25565, InternetProtocol.TCP))
+                    .withStdinOpen(true);
+
+            cmd.getHostConfig().setPortBindings(new Ports(new ExposedPort(25565, InternetProtocol.TCP), new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565)));
+
+            response = cmd.exec();
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);
             return false;
@@ -89,7 +93,9 @@ public class BungeeManager {
 
         log.info("Starting Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress()+ " for network " + network.getName()+ " on node "+node.getName());
         try {
-            dockerClient.startContainerCmd(containerId).withPortBindings(new Ports(new ExposedPort(25562, InternetProtocol.TCP), new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565)))
+            dockerClient.startContainerCmd(containerId)
+                    .withPublishAllPorts(true)
+                    .withPortBindings(new PortBinding(new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565), new ExposedPort(25565, InternetProtocol.TCP)))
                     .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);

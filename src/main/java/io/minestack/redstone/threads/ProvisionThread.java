@@ -120,7 +120,7 @@ public class ProvisionThread extends Thread {
                     }
                     boolean publish = false;
                     if (runningBungee != null) {
-                        if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() + 30000) {
+                        if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
                             //bungee hasn't updated is 30 seconds. probably dead
                             try {
                                 redstone.getBungeeManager().removeContainer(runningBungee);
@@ -140,16 +140,23 @@ public class ProvisionThread extends Thread {
                         message.put("network", network.getId().toString());
                         message.put("bungeeType", networkNode.getBungeeType().getId().toString());
                         message.put("node", networkNode.getNode().getId().toString());
-                        message.put("publicAddress", networkNode.getNodePublicAddress());
+                        message.put("publicAddress", networkNode.getNodePublicAddress().getId().toString());
 
                         try {
                             if (bungeePublisher != null) {
                                 bungeePublisher.publish(message);
-                                bungeePublisher.close();
                             }
                         } catch (IOException e) {
                             log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                         }
+                    }
+
+                    try {
+                        if (bungeePublisher != null) {
+                            bungeePublisher.close();
+                        }
+                    } catch (IOException e) {
+                        log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                     }
                 }
 

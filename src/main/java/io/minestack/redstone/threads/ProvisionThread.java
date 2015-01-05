@@ -8,10 +8,11 @@ import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueue;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueues;
 import io.minestack.doublechest.model.bungee.Bungee;
 import io.minestack.doublechest.model.network.Network;
-import io.minestack.doublechest.model.node.NetworkNode;
 import io.minestack.doublechest.model.node.Node;
 import io.minestack.doublechest.model.node.NodePublicAddress;
 import io.minestack.doublechest.model.pluginhandler.bungeetype.BungeeType;
+import io.minestack.doublechest.model.pluginhandler.bungeetype.NetworkBungeeType;
+import io.minestack.doublechest.model.pluginhandler.bungeetype.NetworkBungeeTypeAddress;
 import io.minestack.doublechest.model.pluginhandler.servertype.NetworkServerType;
 import io.minestack.doublechest.model.server.Server;
 import io.minestack.redstone.Redstone;
@@ -106,57 +107,56 @@ public class ProvisionThread extends Thread {
         while (true) {
 
             for (Network network : DoubleChest.INSTANCE.getMongoDatabase().getNetworkRepository().getModels()) {
-                for (NetworkNode networkNode : network.getNodes().values()) {
-                    if (networkNode.getBungeeType() == null) {
-                        continue;
-                    }
+                for (NetworkBungeeType networkBungeeType : network.getBungeeTypes().values()) {
+                    for (NetworkBungeeTypeAddress address : networkBungeeType.getAddresses().values()) {
+                        Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeAddressBungee(network, address.getNode(), address.getPublicAddress());
 
-                    Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeBungee(network, networkNode.getNode());
-                    WorkerPublisher bungeePublisher = null;
-                    try {
-                        bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name());
-                    } catch (IOException e) {
-                        log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
-                    }
-                    boolean publish = false;
-                    if (runningBungee != null) {
-                        if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
-                            //bungee hasn't updated is 30 seconds. probably dead
+                        WorkerPublisher bungeePublisher = null;
+                        try {
+                            bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name());
+                        } catch (IOException e) {
+                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                        }
+                        boolean publish = false;
+                        if (runningBungee != null) {
+                            if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
+                                //bungee hasn't updated is 30 seconds. probably dead
+                                try {
+                                    redstone.getBungeeManager().removeContainer(runningBungee);
+                                    DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(runningBungee);
+                                    publish = true;
+                                } catch (Exception e) {
+                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                                }
+                            }
+                        } else {
+                            publish = true;
+                        }
+
+                        if (publish == true) {
+                            JSONObject message = new JSONObject();
+
+                            message.put("network", network.getId().toString());
+                            message.put("bungeeType", networkBungeeType.getId().toString());
+                            message.put("node", address.getNode().getId().toString());
+                            message.put("publicAddress", address.getPublicAddress().getId().toString());
+
                             try {
-                                redstone.getBungeeManager().removeContainer(runningBungee);
-                                DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(runningBungee);
-                                publish = true;
-                            } catch (Exception e) {
+                                if (bungeePublisher != null) {
+                                    bungeePublisher.publish(message);
+                                }
+                            } catch (IOException e) {
                                 log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                             }
                         }
-                    } else {
-                        publish = true;
-                    }
-
-                    if (publish == true) {
-                        JSONObject message = new JSONObject();
-
-                        message.put("network", network.getId().toString());
-                        message.put("bungeeType", networkNode.getBungeeType().getId().toString());
-                        message.put("node", networkNode.getNode().getId().toString());
-                        message.put("publicAddress", networkNode.getNodePublicAddress().getId().toString());
 
                         try {
                             if (bungeePublisher != null) {
-                                bungeePublisher.publish(message);
+                                bungeePublisher.close();
                             }
                         } catch (IOException e) {
                             log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                         }
-                    }
-
-                    try {
-                        if (bungeePublisher != null) {
-                            bungeePublisher.close();
-                        }
-                    } catch (IOException e) {
-                        log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                     }
                 }
 

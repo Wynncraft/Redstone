@@ -107,6 +107,29 @@ public class ProvisionThread extends Thread {
         while (true) {
 
             for (Network network : DoubleChest.INSTANCE.getMongoDatabase().getNetworkRepository().getModels()) {
+
+                List<Bungee> bungees = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkBungees(network);
+                Iterator<Bungee> bungeeIterator = bungees.iterator();
+                while (bungeeIterator.hasNext()) {
+                    Bungee bungee = bungeeIterator.next();
+                    if (bungee.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
+                        //bungee hasn't updated in 30 seconds. probably dead
+                        try {
+                            if (bungee.getNode() != null) {
+                                try {
+                                    redstone.getBungeeManager().removeContainer(bungee);
+                                } catch (Exception e) {
+                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                                }
+                            }
+                            DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(bungee);
+                            bungeeIterator.remove();
+                        } catch (Exception e) {
+                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                        }
+                    }
+                }
+
                 for (NetworkBungeeType networkBungeeType : network.getBungeeTypes().values()) {
                     for (NetworkBungeeTypeAddress address : networkBungeeType.getAddresses().values()) {
                         Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeAddressBungee(network, address.getNode(), address.getPublicAddress());
@@ -168,7 +191,11 @@ public class ProvisionThread extends Thread {
                         //server hasn't updated in 30 seconds. probably dead
                         try {
                             if (server.getNode() != null) {
-                                redstone.getServerManager().removeContainer(server);
+                                try {
+                                    redstone.getServerManager().removeContainer(server);
+                                } catch (Exception e) {
+                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                                }
                             }
                             DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().removeModel(server);
                             serverIterator.remove();

@@ -25,13 +25,6 @@ public class BungeeManager {
     public boolean createBungee(Network network, BungeeType bungeeType, Node node, NodePublicAddress nodePublicAddress) {
         log.info("Creating Bungee " + bungeeType.getName() + " for network " + network.getName() + " on node "+node.getName());
 
-        Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeBungee(network, node);
-
-        if (runningBungee != null) {
-            log.error("Tried to create multiple bungees on node "+node.getName()+" for network "+network.getName());
-            return false;
-        }
-
         if (node.canFitBungee(bungeeType) == false) {
             log.error("Cannot fit bungee type "+bungeeType.getName()+" for network "+network.getName()+" on node "+node.getName());
             return false;

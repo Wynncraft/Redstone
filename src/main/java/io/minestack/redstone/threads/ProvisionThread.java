@@ -3,7 +3,8 @@ package io.minestack.redstone.threads;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Envelope;
 import io.minestack.doublechest.DoubleChest;
-import io.minestack.doublechest.databases.rabbitmq.worker.WorkerPublisher;
+import io.minestack.doublechest.databases.rabbitmq.publishers.BungeeCreatePublisher;
+import io.minestack.doublechest.databases.rabbitmq.publishers.ServerCreatePublisher;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueue;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueues;
 import io.minestack.doublechest.model.bungee.Bungee;
@@ -22,7 +23,6 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -135,27 +135,12 @@ public class ProvisionThread extends Thread {
                         Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeAddressBungee(network, address.getNode(), address.getPublicAddress());
 
                         if (runningBungee == null) {
-                            JSONObject message = new JSONObject();
-
-                            message.put("network", network.getId().toString());
-                            message.put("bungeeType", networkBungeeType.getBungeeType().getId().toString());
-                            message.put("node", address.getNode().getId().toString());
-                            message.put("publicAddress", address.getPublicAddress().getId().toString());
                             try {
-                                WorkerPublisher bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name());
-
-                                try {
-                                    bungeePublisher.publish(message);
-                                } catch (IOException e) {
-                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
-                                }
-
-                                bungeePublisher.close();
+                                new BungeeCreatePublisher().createBungee(networkBungeeType.getBungeeType(), network, address.getPublicAddress());
                             } catch (IOException e) {
                                 log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                             }
                         }
-
                     }
                 }
 
@@ -190,24 +175,12 @@ public class ProvisionThread extends Thread {
                     if (servers.size() < networkServerType.getAmount()) {
                         int diff = networkServerType.getAmount() - servers.size();
                         for (int i = 0; i < diff; i++) {
-                            Server server = new Server(new ObjectId(), new Date(System.currentTimeMillis()));
-                            server.setNetwork(network);
-                            server.setServerType(networkServerType.getServerType());
-                            server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
-                            DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().insertModel(server);
-
-                            JSONObject message = new JSONObject();
-                            message.put("server", server.getId().toString());
-
                             try {
-                                WorkerPublisher serverPublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.SERVER_BUILD.name());
-                                serverPublisher.publish(message);
-                                serverPublisher.close();
+                                new ServerCreatePublisher().createServer(networkServerType.getServerType(), network);
                             } catch (IOException e) {
                                 log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                             }
                         }
-
                     }
                 }
             }

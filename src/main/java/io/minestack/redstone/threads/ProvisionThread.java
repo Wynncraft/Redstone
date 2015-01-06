@@ -9,9 +9,6 @@ import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueue;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueues;
 import io.minestack.doublechest.model.bungee.Bungee;
 import io.minestack.doublechest.model.network.Network;
-import io.minestack.doublechest.model.node.Node;
-import io.minestack.doublechest.model.node.NodePublicAddress;
-import io.minestack.doublechest.model.pluginhandler.bungeetype.BungeeType;
 import io.minestack.doublechest.model.pluginhandler.bungeetype.NetworkBungeeType;
 import io.minestack.doublechest.model.pluginhandler.bungeetype.NetworkBungeeTypeAddress;
 import io.minestack.doublechest.model.pluginhandler.servertype.NetworkServerType;
@@ -75,20 +72,27 @@ public class ProvisionThread extends Thread {
 
         try {
             bungeeWorkerQueue = new WorkerQueue(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name()) {
+
+                ArrayList<ObjectId> creatingBungees = new ArrayList<>();
+
                 @Override
                 public void messageDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties basicProperties, byte[] bytes) throws IOException {
                     JSONObject jsonObject = new JSONObject(new String(bytes));
-                    Network network = DoubleChest.INSTANCE.getMongoDatabase().getNetworkRepository().getModel(new ObjectId(jsonObject.getString("network")));
-                    BungeeType bungeeType = DoubleChest.INSTANCE.getMongoDatabase().getBungeeTypeRepository().getModel(new ObjectId(jsonObject.getString("bungeeType")));
-                    Node node = DoubleChest.INSTANCE.getMongoDatabase().getNodeRepository().getModel(new ObjectId(jsonObject.getString("node")));
+
+                    ObjectId objectId = new ObjectId(jsonObject.getString("bungee"));
+
+                    if (creatingBungees.contains(objectId)) {
+                        log.warn("Already creating the bungee with the objectId of " + objectId.toString());
+                        getChannel().basicNack(envelope.getDeliveryTag(), false, false);
+                        return;
+                    }
+
+                    Bungee bungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getModel(objectId);
 
                     boolean success = false;
 
-                    if (network != null && bungeeType != null && node != null) {
-                        NodePublicAddress publicAddress = node.getPublicAddresses().get(new ObjectId(jsonObject.getString("publicAddress")));
-                        if (publicAddress != null) {
-                            success = redstone.getBungeeManager().createBungee(network, bungeeType, node, publicAddress);
-                        }
+                    if (bungee != null) {
+                        success = redstone.getBungeeManager().createBungee(bungee);
                     }
 
                     if (success == true) {
@@ -96,6 +100,7 @@ public class ProvisionThread extends Thread {
                     } else {
                         getChannel().basicNack(envelope.getDeliveryTag(), false, false);
                     }
+                    creatingBungees.remove(objectId);
                 }
             };
         } catch (IOException e) {

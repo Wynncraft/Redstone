@@ -7,12 +7,7 @@ import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DockerClientBuilder;
 import io.minestack.doublechest.DoubleChest;
 import io.minestack.doublechest.model.bungee.Bungee;
-import io.minestack.doublechest.model.network.Network;
-import io.minestack.doublechest.model.node.Node;
-import io.minestack.doublechest.model.node.NodePublicAddress;
-import io.minestack.doublechest.model.pluginhandler.bungeetype.BungeeType;
 import lombok.extern.log4j.Log4j2;
-import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,24 +17,30 @@ import java.util.List;
 @Log4j2
 public class BungeeManager {
 
-    public boolean createBungee(Network network, BungeeType bungeeType, Node node, NodePublicAddress nodePublicAddress) {
-        log.info("Creating Bungee " + bungeeType.getName() + " for network " + network.getName() + " on node "+node.getName());
-
-        if (node.canFitBungee(bungeeType) == false) {
-            log.error("Cannot fit bungee type "+bungeeType.getName()+" for network "+network.getName()+" on node "+node.getName());
+    public boolean createBungee(Bungee bungee) {
+        if (bungee.getNode() == null) {
+            log.error("Tried to create a bungee with a null node.");
             return false;
         }
+        if (bungee.getPublicAddress() == null) {
+            log.error("Tried to create a bungee with a null public address.");
+            return false;
+        }
+        if (bungee.getNetwork() == null) {
+            log.error("Tried to create a bungee with a null network.");
+            return false;
+        }
+        if (bungee.getBungeeType() == null) {
+            log.error("Tried to create a bungee with a null bungee type.");
+            return false;
+        }
+        if (bungee.getNode().canFitBungee(bungee.getBungeeType()) == false) {
+            log.error("Cannot fit bungee type "+bungee.getBungeeType().getName()+" for network "+bungee.getNetwork().getName()+" on node "+bungee.getNode().getName());
+            return false;
+        }
+        log.info("Creating Bungee " + bungee.getBungeeType().getName() + " for network " + bungee.getNetwork().getName() + " on node "+bungee.getNode().getName());
 
-        Bungee bungee = new Bungee(new ObjectId(), new Date(System.currentTimeMillis()));
-        bungee.setNetwork(network);
-        bungee.setNode(node);
-        bungee.setBungeeType(bungeeType);
-        bungee.setPublicAddress(nodePublicAddress);
-        bungee.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
-
-        DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().insertModel(bungee);
-
-        log.info("Removing any old Docker Containers for " + bungeeType.getName() + "."+nodePublicAddress.getPublicAddress()+" for network " + network.getName() + " on node "+node.getName());
+        log.info("Removing any old Docker Containers for " + bungee.getBungeeType().getName() + "."+bungee.getPublicAddress().getPublicAddress()+" for network " + bungee.getNetwork().getName() + " on node "+bungee.getNode().getName());
         try {
             removeContainer(bungee);
         } catch (Exception e) {
@@ -47,7 +48,7 @@ public class BungeeManager {
             return false;
         }
 
-        log.info("Setting up Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress() + " for network " + network.getName() + " on node "+node.getName());
+        log.info("Setting up Docker Container for " + bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress() + " for network " + bungee.getNetwork().getName() + " on node "+bungee.getNode().getName());
 
         DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + bungee.getNode().getPrivateAddress() + ":4243").build();
         CreateContainerResponse response;
@@ -68,7 +69,7 @@ public class BungeeManager {
 
             CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bungee")
                     .withEnv(env.toArray(new String[env.size()]))
-                    .withName(bungeeType.getName() + "." + nodePublicAddress.getPublicAddress())
+                    .withName(bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress())
                     .withExposedPorts(new ExposedPort(25565, InternetProtocol.TCP))
                     .withStdinOpen(true);
 
@@ -83,9 +84,10 @@ public class BungeeManager {
 
         String containerId = response.getId();
         bungee.setContainerId(containerId);
+        bungee.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for bungee to start up
         DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().saveModel(bungee);
 
-        log.info("Starting Docker Container for " + bungeeType.getName() + "." + nodePublicAddress.getPublicAddress()+ " for network " + network.getName()+ " on node "+node.getName());
+        log.info("Starting Docker Container for " + bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress()+ " for network " + bungee.getNetwork().getName()+ " on node "+bungee.getNode().getName());
         try {
             dockerClient.startContainerCmd(containerId)
                     .withPublishAllPorts(true)

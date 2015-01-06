@@ -19,7 +19,6 @@
         </snapshotRepository>
     </distributionManagement>
 
-
     <build>
         <finalName>${project.artifactId}</finalName>
         <resources>

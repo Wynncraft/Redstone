@@ -85,6 +85,7 @@ public class ServerManager {
                     .withEnv(env.toArray(new String[env.size()]))
                     .withName(server.getServerType().getName() + "." + server.getNumber())
                     .withStdinOpen(true)
+                    .withHostName(server.getServerType().getName()+"."+server.getNumber())
                     .exec();
         } catch (Exception e) {
             log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);

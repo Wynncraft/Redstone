@@ -73,6 +73,7 @@ public class BungeeManager {
                     .withStdinOpen(true);
 
             cmd.getHostConfig().setPortBindings(new Ports(new ExposedPort(25565, InternetProtocol.TCP), new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565)));
+            cmd.withHostName(bungee.getBungeeType().getName()+"."+bungee.getPublicAddress().getPublicAddress());
 
             response = cmd.exec();
         } catch (Exception e) {

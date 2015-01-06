@@ -48,7 +48,7 @@ public class ProvisionThread extends Thread {
                     ObjectId objectId = new ObjectId(jsonObject.getString("server"));
 
                     if (creatingServers.contains(objectId)) {
-                        log.warn("Already creating the server with the objectId of "+objectId.toString());
+                        log.warn("Already creating the server with the objectId of " + objectId.toString());
                         getChannel().basicNack(envelope.getDeliveryTag(), false, false);
                         return;
                     }
@@ -134,52 +134,28 @@ public class ProvisionThread extends Thread {
                     for (NetworkBungeeTypeAddress address : networkBungeeType.getAddresses().values()) {
                         Bungee runningBungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeAddressBungee(network, address.getNode(), address.getPublicAddress());
 
-                        WorkerPublisher bungeePublisher = null;
-                        try {
-                            bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name());
-                        } catch (IOException e) {
-                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
-                        }
-                        boolean publish = false;
-                        if (runningBungee != null) {
-                            if (runningBungee.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
-                                //bungee hasn't updated is 30 seconds. probably dead
-                                try {
-                                    redstone.getBungeeManager().removeContainer(runningBungee);
-                                    DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(runningBungee);
-                                    publish = true;
-                                } catch (Exception e) {
-                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
-                                }
-                            }
-                        } else {
-                            publish = true;
-                        }
-
-                        if (publish == true) {
+                        if (runningBungee == null) {
                             JSONObject message = new JSONObject();
 
                             message.put("network", network.getId().toString());
-                            message.put("bungeeType", networkBungeeType.getId().toString());
+                            message.put("bungeeType", networkBungeeType.getBungeeType().getId().toString());
                             message.put("node", address.getNode().getId().toString());
                             message.put("publicAddress", address.getPublicAddress().getId().toString());
-
                             try {
-                                if (bungeePublisher != null) {
+                                WorkerPublisher bungeePublisher = new WorkerPublisher(DoubleChest.INSTANCE.getRabbitMQDatabase(), WorkerQueues.BUNGEE_BUILD.name());
+
+                                try {
                                     bungeePublisher.publish(message);
+                                } catch (IOException e) {
+                                    log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                                 }
+
+                                bungeePublisher.close();
                             } catch (IOException e) {
                                 log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                             }
                         }
 
-                        try {
-                            if (bungeePublisher != null) {
-                                bungeePublisher.close();
-                            }
-                        } catch (IOException e) {
-                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
-                        }
                     }
                 }
 
@@ -228,7 +204,7 @@ public class ProvisionThread extends Thread {
                                 serverPublisher.publish(message);
                                 serverPublisher.close();
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                             }
                         }
 

@@ -33,11 +33,11 @@ public class ServerManager {
             return false;
         }
         if (server.getNetwork().getServerTypes().containsKey(server.getServerType().getId()) == false) {
-            log.error("Tried to create "+server.getServerType().getName()+" on network "+server.getNetwork().getName()+" when it has not been added.");
+            log.error("Tried to create " + server.getServerType().getName() + " on network " + server.getNetwork().getName() + " when it has not been added.");
             return false;
         }
         if (DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(server.getNetwork()).size() > server.getNetwork().getServerTypes().get(server.getServerType().getId()).getAmount()) {
-            log.error("Tried to create more servers then provisioned on network "+server.getNetwork().getName());
+            log.error("Tried to create more servers then provisioned on network " + server.getNetwork().getName());
             return false;
         }
 
@@ -71,10 +71,14 @@ public class ServerManager {
             List<String> env = new ArrayList<>();
             env.add("mongo_addresses=" + System.getenv("mongo_addresses"));
             env.add("mongo_database=" + System.getenv("mongo_database"));
+            if (System.getenv("mongo_username") != null) {
+                env.add("mongo_username=" + System.getenv("mongo_username"));
+                env.add("mongo_password=" + System.getenv("mongo_password"));
+            }
             env.add("rabbit_addresses=" + System.getenv("rabbit_addresses"));
-            env.add("rabbit_username="+System.getenv("rabbit_username"));
-            env.add("rabbit_password="+System.getenv("rabbit_password"));
-            env.add("server_id="+server.getId());
+            env.add("rabbit_username=" + System.getenv("rabbit_username"));
+            env.add("rabbit_password=" + System.getenv("rabbit_password"));
+            env.add("server_id=" + server.getId());
 
             if (System.getenv("mongo_username") != null) {
                 env.add("mongo_username=" + System.getenv("mongo_username"));
@@ -85,7 +89,7 @@ public class ServerManager {
                     .withEnv(env.toArray(new String[env.size()]))
                     .withName(server.getServerType().getName() + "." + server.getNumber())
                     .withStdinOpen(true)
-                    .withHostName(server.getServerType().getName()+"."+server.getNumber())
+                    .withHostName(server.getServerType().getName() + "." + server.getNumber())
                     .exec();
         } catch (Exception e) {
             log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);

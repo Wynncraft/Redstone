@@ -57,6 +57,10 @@ public class BungeeManager {
             List<String> env = new ArrayList<>();
             env.add("mongo_addresses=" + System.getenv("mongo_addresses"));
             env.add("mongo_database=" + System.getenv("mongo_database"));
+            if (System.getenv("mongo_username") != null) {
+                env.add("mongo_username=" + System.getenv("mongo_username"));
+                env.add("mongo_password=" + System.getenv("mongo_password"));
+            }
             env.add("rabbit_addresses=" + System.getenv("rabbit_addresses"));
             env.add("rabbit_username="+System.getenv("rabbit_username"));
             env.add("rabbit_password="+System.getenv("rabbit_password"));

@@ -149,7 +149,7 @@ public class ProvisionThread extends Thread {
                     }
                 }
 
-                List<Server> servers = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(network);
+                List<Server> servers = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(network, false);
                 Iterator<Server> serverIterator = servers.iterator();
                 while (serverIterator.hasNext()) {
                     Server server = serverIterator.next();

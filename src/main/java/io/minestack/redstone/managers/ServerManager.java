@@ -36,7 +36,7 @@ public class ServerManager {
             log.error("Tried to create " + server.getServerType().getName() + " on network " + server.getNetwork().getName() + " when it has not been added.");
             return false;
         }
-        if (DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(server.getNetwork()).size() > server.getNetwork().getServerTypes().get(server.getServerType().getId()).getAmount()) {
+        if (DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(server.getNetwork(), true).size() > server.getNetwork().getServerTypes().get(server.getServerType().getId()).getAmount()) {
             log.error("Tried to create more servers then provisioned on network " + server.getNetwork().getName());
             return false;
         }

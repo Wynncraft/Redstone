@@ -37,7 +37,7 @@ public class ServerManager {
             return false;
         }
         if (DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServerTypeServers(server.getNetwork(), server.getServerType(), true).size() > server.getNetwork().getServerTypes().get(server.getServerType().getId()).getAmount()) {
-            log.error("Tried to create more servers then provisioned on network " + server.getNetwork().getName());
+            log.error("Tried to create more servers "+server.getServerType().getName()+" then provisioned on network " + server.getNetwork().getName());
             return false;
         }
 

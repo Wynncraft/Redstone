@@ -175,7 +175,7 @@ public class ProvisionThread extends Thread {
                     if (networkServerType.isManualStart() == true) {
                         continue;
                     }
-                    servers = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServerTypeServers(network, networkServerType.getServerType());
+                    servers = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServerTypeServers(network, networkServerType.getServerType(), false);
 
                     if (servers.size() < networkServerType.getAmount()) {
                         int diff = networkServerType.getAmount() - servers.size();

@@ -80,11 +80,6 @@ public class ServerManager {
             env.add("rabbit_password=" + System.getenv("rabbit_password"));
             env.add("server_id=" + server.getId());
 
-            if (System.getenv("mongo_username") != null) {
-                env.add("mongo_username=" + System.getenv("mongo_username"));
-                env.add("mongo_password=" + System.getenv("mongo_password"));
-            }
-
             response = dockerClient.createContainerCmd("minestack/bukkit")
                     .withEnv(env.toArray(new String[env.size()]))
                     .withName(server.getServerType().getName() + "." + server.getNumber())

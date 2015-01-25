@@ -66,11 +66,6 @@ public class BungeeManager {
             env.add("rabbit_password="+System.getenv("rabbit_password"));
             env.add("bungee_id=" + bungee.getId());
 
-            if (System.getenv("mongo_username") != null) {
-                env.add("mongo_username=" + System.getenv("mongo_username"));
-                env.add("mongo_password=" + System.getenv("mongo_password"));
-            }
-
             CreateContainerCmd cmd = dockerClient.createContainerCmd("minestack/bungee")
                     .withEnv(env.toArray(new String[env.size()]))
                     .withName(bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress())

@@ -1,5 +1,7 @@
 package io.minestack.redstone.threads;
 
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DockerClientBuilder;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Envelope;
 import io.minestack.doublechest.DoubleChest;
@@ -9,6 +11,8 @@ import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueue;
 import io.minestack.doublechest.databases.rabbitmq.worker.WorkerQueues;
 import io.minestack.doublechest.model.bungee.Bungee;
 import io.minestack.doublechest.model.network.Network;
+import io.minestack.doublechest.model.node.NetworkNode;
+import io.minestack.doublechest.model.node.Node;
 import io.minestack.doublechest.model.pluginhandler.bungeetype.NetworkBungeeType;
 import io.minestack.doublechest.model.pluginhandler.bungeetype.NetworkBungeeTypeAddress;
 import io.minestack.doublechest.model.pluginhandler.servertype.NetworkServerType;
@@ -20,6 +24,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -113,11 +118,25 @@ public class ProvisionThread extends Thread {
 
             for (Network network : DoubleChest.INSTANCE.getMongoDatabase().getNetworkRepository().getModels()) {
 
+                for (NetworkNode networkNode : network.getNodes().values()) {
+                    Node node = networkNode.getNode();
+                    if (node != null) {
+                        try {
+                            DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + node.getPrivateAddress() + ":4243").build();
+                            dockerClient.listContainersCmd().withShowAll(true).exec().stream().filter(container -> container.getStatus().toLowerCase().contains("exit")).forEach(container -> {
+                                log.info("Deleting dead container" + Arrays.toString(container.getNames()));
+                                dockerClient.removeContainerCmd(container.getId()).withForce(true).exec();
+                            });
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+
                 List<Bungee> bungees = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkBungees(network);
                 Iterator<Bungee> bungeeIterator = bungees.iterator();
                 while (bungeeIterator.hasNext()) {
                     Bungee bungee = bungeeIterator.next();
-                    if (bungee.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
+                    if (System.currentTimeMillis() - bungee.getUpdated_at().getTime() > 30000) {
                         //bungee hasn't updated in 30 seconds. probably dead
                         try {
                             if (bungee.getNode() != null) {
@@ -153,7 +172,7 @@ public class ProvisionThread extends Thread {
                 Iterator<Server> serverIterator = servers.iterator();
                 while (serverIterator.hasNext()) {
                     Server server = serverIterator.next();
-                    if (server.getUpdated_at().getTime() < System.currentTimeMillis() - 30000) {
+                    if (System.currentTimeMillis() - server.getUpdated_at().getTime() > 30000) {
                         //server hasn't updated in 30 seconds. probably dead
                         try {
                             if (server.getNode() != null) {
@@ -164,7 +183,7 @@ public class ProvisionThread extends Thread {
                                 }
                             }
                             DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().removeModel(server);
-                            serverIterator.remove();
+                            //serverIterator.remove();
                         } catch (Exception e) {
                             log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                         }

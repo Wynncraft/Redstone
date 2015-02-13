@@ -135,23 +135,39 @@ public class ProvisionThread extends Thread {
                 List<Bungee> bungees = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkBungees(network);
                 Iterator<Bungee> bungeeIterator = bungees.iterator();
                 while (bungeeIterator.hasNext()) {
-                    Bungee bungee = bungeeIterator.next();
-                    if (System.currentTimeMillis() - bungee.getUpdated_at().getTime() > 30000) {
-                        //bungee hasn't updated in 30 seconds. probably dead
-                        try {
-                            if (bungee.getNode() != null) {
+                    Bungee oldBungee = bungeeIterator.next();
+                    if (oldBungee.getNode() != null && oldBungee.getPublicAddress() != null) {
+                        Bungee bungee = DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().getNetworkNodeAddressBungee(network, oldBungee.getNode(), oldBungee.getPublicAddress());
+                        if (bungee != null) {
+                            if (System.currentTimeMillis() - bungee.getUpdated_at().getTime() > 60000) {
+                                //bungee hasn't updated in 30 seconds. probably dead
                                 try {
-                                    redstone.getBungeeManager().removeContainer(bungee);
+                                    if (bungee.getNode() != null) {
+                                        try {
+                                            log.info("Removing Timed out Bungee " + bungee.getBungeeType().getName() + " " + bungee.getPublicAddress().getPublicAddress());
+                                            redstone.getBungeeManager().removeContainer(bungee);
+                                        } catch (Exception e) {
+                                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                                        }
+                                    }
+                                    DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(bungee);
                                 } catch (Exception e) {
                                     log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                                 }
                             }
-                            DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(bungee);
-                            bungeeIterator.remove();
-                        } catch (Exception e) {
-                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                         }
+                    } else {
+                        if (oldBungee.getNode() != null) {
+                            try {
+                                log.info("Removing Timed out Bungee");
+                                redstone.getBungeeManager().removeContainer(oldBungee);
+                            } catch (Exception e) {
+                                log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                            }
+                        }
+                        DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().removeModel(oldBungee);
                     }
+                    bungeeIterator.remove();
                 }
 
                 for (NetworkBungeeType networkBungeeType : network.getBungeeTypes().values()) {
@@ -171,23 +187,37 @@ public class ProvisionThread extends Thread {
                 List<Server> servers = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServers(network, false);
                 Iterator<Server> serverIterator = servers.iterator();
                 while (serverIterator.hasNext()) {
-                    Server server = serverIterator.next();
-                    if (System.currentTimeMillis() - server.getUpdated_at().getTime() > 30000) {
-                        //server hasn't updated in 30 seconds. probably dead
-                        try {
-                            if (server.getNode() != null) {
+                    Server oldServer = serverIterator.next();
+                    if (oldServer.getServerType() != null) {
+                        Server server = DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().getNetworkServerTypeServerNumber(network, oldServer.getServerType(), oldServer.getNumber());
+                        if (server != null) {
+                            if (System.currentTimeMillis() - server.getUpdated_at().getTime() > 60000) {
+                                //server hasn't updated in 30 seconds. probably dead
                                 try {
-                                    redstone.getServerManager().removeContainer(server);
+                                    if (server.getNode() != null) {
+                                        try {
+                                            log.info("Removing Timed out Server " + server.getServerType().getName() + " " + server.getNumber());
+                                            redstone.getServerManager().removeContainer(server);
+                                        } catch (Exception e) {
+                                            log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
+                                        }
+                                    }
+                                    DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().removeModel(server);
                                 } catch (Exception e) {
                                     log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                                 }
                             }
-                            DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().removeModel(server);
-                            //serverIterator.remove();
+                        }
+                    } else {
+                        try {
+                            log.info("Removing Timed out Server");
+                            redstone.getServerManager().removeContainer(oldServer);
                         } catch (Exception e) {
                             log.error("Threw a Exception in ProvisionThread::run, full stack trace follows: ", e);
                         }
+                        DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().removeModel(oldServer);
                     }
+                    serverIterator.remove();
                 }
 
                 for (NetworkServerType networkServerType : network.getServerTypes().values()) {

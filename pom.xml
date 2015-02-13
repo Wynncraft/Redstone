@@ -80,10 +80,15 @@
                                     <include>org.glassfish.hk2.external:*</include>
                                     <include>org.glassfish.hk2:*</include>
                                     <include>org.glassfish.jersey.bundles.repackaged:jersey-guava:*</include>
-                                    <include>org.glassfish.jersey.connectors:jersey-jetty-connector:*</include>
+                                    <include>org.glassfish.jersey.connectors:jersey-apache-connector:*</include>
                                     <include>org.glassfish.jersey.core:*</include>
                                     <include>org.slf4j:*</include>
                                     <include>org.bouncycastle:*</include>
+                                    <include>org.apache.commons:commons-compress:*</include>
+                                    <include>commons-io:commons-io:*</include>
+                                    <include>org.apache.httpcomponents:*</include>
+                                    <include>de.gesellix:unix-socket-factory:*</include>
+                                    <include>commons-logging:commons-logging:*</include>
                                     <!-- Double Chest-->
                                     <include>io.minestack:DoubleChest:*</include>
                                 </includes>
@@ -143,7 +148,7 @@
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java</artifactId>
-            <version>0.10.4</version>
+            <version>0.10.5</version>
         </dependency>
         <dependency>
             <groupId>io.minestack</groupId>

@@ -96,6 +96,12 @@ public class ServerManager {
         server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
         DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().saveModel(server);
 
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         log.info("Starting Docker Container for " + server.getServerType().getName() + "." + server.getNumber() + " for network " + server.getNetwork().getName());
         try {
             dockerClient.startContainerCmd(containerId).withPublishAllPorts(true).withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();

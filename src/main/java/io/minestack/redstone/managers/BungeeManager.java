@@ -86,6 +86,12 @@ public class BungeeManager {
         bungee.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for bungee to start up
         DoubleChest.INSTANCE.getMongoDatabase().getBungeeRepository().saveModel(bungee);
 
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         log.info("Starting Docker Container for " + bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress()+ " for network " + bungee.getNetwork().getName()+ " on node "+bungee.getNode().getName());
         try {
             dockerClient.startContainerCmd(containerId)

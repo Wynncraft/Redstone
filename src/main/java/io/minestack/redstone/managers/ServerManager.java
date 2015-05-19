@@ -7,19 +7,30 @@ import com.github.dockerjava.api.model.Container;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
 import io.minestack.doublechest.DoubleChest;
+import io.minestack.doublechest.model.node.NetworkNode;
 import io.minestack.doublechest.model.node.Node;
 import io.minestack.doublechest.model.server.Server;
+import io.minestack.redstone.Redstone;
+import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import net.kencochrane.raven.event.Event;
+import net.kencochrane.raven.event.EventBuilder;
+import net.kencochrane.raven.event.interfaces.ExceptionInterface;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.function.Predicate;
 
 @Log4j2
+@AllArgsConstructor
 public class ServerManager {
 
+    private Redstone redstone;
+
     public boolean createServer(Server server) {
+        return createServer(server, (node) -> false);
+    }
+
+    public boolean createServer(Server server, Predicate<Node> filter) {
         if (server.getNode() != null) {
             log.error("Tried to create a already running server.");
             return false;
@@ -45,7 +56,26 @@ public class ServerManager {
         server.setNumber(number);
 
         log.info("Creating Server " + server.getServerType().getName() + " for network " + server.getNetwork().getName());
-        Node node = server.getNetwork().findNodeForServer(server.getServerType());
+
+        Iterator<NetworkNode> iterator = server.getNetwork().getNodes()
+                .values()
+                .iterator();
+        Node node = null;
+
+        while (iterator.hasNext()) {
+            NetworkNode next = iterator.next();
+
+            if (next.getNode().canFitServer(server.getServerType())) {
+                if (filter.test(next.getNode()))
+                    continue;
+
+                if (node == null) {
+                    node = next.getNode();
+                } else if (next.getNode().getFreeRam() > node.getFreeRam()) {
+                    node = next.getNode();
+                }
+            }
+        }
 
         if (node == null) {
             log.error("Could not find a node to place " + server.getServerType().getName() + " for network " + server.getNetwork().getName() + " on. Is the network over provisioned?");
@@ -87,7 +117,12 @@ public class ServerManager {
                     .withHostName(server.getServerType().getName() + "." + server.getNumber())
                     .exec();
         } catch (Exception e) {
-            log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);
+            log.error("Could not create server on node " + node.getName() + ", attempting to start on another node");
+            final Node no = node;
+            server.setNode(null);
+
+            createServer(server, (n) -> n.getName().equals(no.getName()));
+            redstone.getRaven().sendEvent(createEvent(e, node));
             return false;
         }
 
@@ -106,11 +141,24 @@ public class ServerManager {
         try {
             dockerClient.startContainerCmd(containerId).withPublishAllPorts(true).withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
-            log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);
+            log.error("Could not create server on node " + node.getName() + ", attempting to start on another node");
+            final Node no = node;
+            server.setNode(null);
+
+            createServer(server, (n) -> n.getName().equals(no.getName()));
+            redstone.getRaven().sendEvent(createEvent(e, node));
             return false;
         }
 
         return true;
+    }
+
+    private Event createEvent(Exception e, Node node) {
+        return new EventBuilder()
+                .withSentryInterface(new ExceptionInterface(e))
+                .withLevel(Event.Level.ERROR)
+                .withExtra("node", node.getName())
+                .build();
     }
 
     public void removeContainer(Server server) throws Exception {

@@ -7,6 +7,8 @@ import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DockerClientBuilder;
 import io.minestack.doublechest.DoubleChest;
 import io.minestack.doublechest.model.bungee.Bungee;
+import io.minestack.redstone.Redstone;
+import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 import java.util.ArrayList;
@@ -15,7 +17,10 @@ import java.util.Date;
 import java.util.List;
 
 @Log4j2
+@AllArgsConstructor
 public class BungeeManager {
+
+    private Redstone redstone;
 
     public boolean createBungee(Bungee bungee) {
         if (bungee.getNode() == null) {
@@ -78,6 +83,7 @@ public class BungeeManager {
             response = cmd.exec();
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);
+            redstone.getRaven().sendException(e);
             return false;
         }
 
@@ -100,6 +106,7 @@ public class BungeeManager {
                     .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);
+            redstone.getRaven().sendException(e);
             return false;
         }
         return true;

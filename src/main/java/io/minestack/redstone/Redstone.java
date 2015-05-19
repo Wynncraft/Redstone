@@ -8,16 +8,20 @@ import io.minestack.redstone.managers.ServerManager;
 import io.minestack.redstone.threads.ProvisionThread;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
+import net.kencochrane.raven.Raven;
+import net.kencochrane.raven.RavenFactory;
 
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Log4j2
 public class Redstone {
 
     public static void main(String[] args) {
-        new Redstone();
+        new Redstone(args[0]);
     }
 
     @Getter
@@ -26,7 +30,10 @@ public class Redstone {
     @Getter
     private final BungeeManager bungeeManager;
 
-    public Redstone() {
+    @Getter
+    private final Raven raven;
+
+    public Redstone(String dsn) {
         log.info("Started Redstone - Minestack Controller");
 
         log.info("Init Mongo Database");
@@ -63,8 +70,10 @@ public class Redstone {
         }
         DoubleChest.INSTANCE.initRabbitMQDatabase(addressList, System.getenv("rabbit_username"), System.getenv("rabbit_password"));
 
-        serverManager = new ServerManager();
-        bungeeManager = new BungeeManager();
+        raven = RavenFactory.ravenInstance(dsn);
+
+        serverManager = new ServerManager(this);
+        bungeeManager = new BungeeManager(this);
 
         ProvisionThread provisionThread = new ProvisionThread(this);
         provisionThread.start();

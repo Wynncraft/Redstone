@@ -27,10 +27,10 @@ public class ServerManager {
     private Redstone redstone;
 
     public boolean createServer(Server server) {
-        return createServer(server, (node) -> false);
+        return createServer(server, (node) -> false, 0);
     }
 
-    public boolean createServer(Server server, Predicate<Node> filter) {
+    public boolean createServer(Server server, Predicate<Node> filter, int times) {
         if (server.getNode() != null) {
             log.error("Tried to create a already running server.");
             return false;
@@ -121,7 +121,7 @@ public class ServerManager {
             final Node no = node;
             server.setNode(null);
 
-            createServer(server, (n) -> n.getName().equals(no.getName()));
+            createServer(server, (n) -> n.getName().equals(no.getName()), 0);
             redstone.getRaven().sendEvent(createEvent(e, node));
             return false;
         }
@@ -141,11 +141,15 @@ public class ServerManager {
         try {
             dockerClient.startContainerCmd(containerId).withPublishAllPorts(true).withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
+            if (times < 3) {
+                return createServer(server, (n) -> false, ++times);
+            }
+
             log.error("Could not create server on node " + node.getName() + ", attempting to start on another node");
             final Node no = node;
             server.setNode(null);
 
-            createServer(server, (n) -> n.getName().equals(no.getName()));
+            createServer(server, (n) -> n.getName().equals(no.getName()), 0);
             redstone.getRaven().sendEvent(createEvent(e, node));
             return false;
         }

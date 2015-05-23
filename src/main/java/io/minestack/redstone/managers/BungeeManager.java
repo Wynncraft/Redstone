@@ -23,6 +23,10 @@ public class BungeeManager {
     private Redstone redstone;
 
     public boolean createBungee(Bungee bungee) {
+        return createBungee(bungee, 0);
+    }
+
+    public boolean createBungee(Bungee bungee, int times) {
         if (bungee.getNode() == null) {
             log.error("Tried to create a bungee with a null node.");
             return false;
@@ -105,6 +109,10 @@ public class BungeeManager {
                     .withPortBindings(new PortBinding(new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565), new ExposedPort(25565, InternetProtocol.TCP)))
                     .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
         } catch (Exception e) {
+            if (times < 3) {
+                return createBungee(bungee, ++times);
+            }
+
             log.error("Threw a Exception in BungeeManager::createBungee, full stack trace follows: ", e);
             redstone.getRaven().sendException(e);
             return false;

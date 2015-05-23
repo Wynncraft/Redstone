@@ -31,7 +31,7 @@ public class ServerManager {
     }
 
     public boolean createServer(Server server, Predicate<Node> filter, int times) {
-        if (server.getNode() != null) {
+        if (server.getNode() != null && times == 0) {
             log.error("Tried to create a already running server.");
             return false;
         }
@@ -57,22 +57,25 @@ public class ServerManager {
 
         log.info("Creating Server " + server.getServerType().getName() + " for network " + server.getNetwork().getName());
 
-        Iterator<NetworkNode> iterator = server.getNetwork().getNodes()
-                .values()
-                .iterator();
-        Node node = null;
+        Node node = server.getNode();
 
-        while (iterator.hasNext()) {
-            NetworkNode next = iterator.next();
+        if (node == null) {
+            Iterator<NetworkNode> iterator = server.getNetwork().getNodes()
+                    .values()
+                    .iterator();
 
-            if (next.getNode().canFitServer(server.getServerType())) {
-                if (filter.test(next.getNode()))
-                    continue;
+            while (iterator.hasNext()) {
+                NetworkNode next = iterator.next();
 
-                if (node == null) {
-                    node = next.getNode();
-                } else if (next.getNode().getFreeRam() > node.getFreeRam()) {
-                    node = next.getNode();
+                if (next.getNode().canFitServer(server.getServerType())) {
+                    if (filter.test(next.getNode()))
+                        continue;
+
+                    if (node == null) {
+                        node = next.getNode();
+                    } else if (next.getNode().getFreeRam() > node.getFreeRam()) {
+                        node = next.getNode();
+                    }
                 }
             }
         }
@@ -127,9 +130,6 @@ public class ServerManager {
         }
 
         String containerId = response.getId();
-        server.setContainerId(containerId);
-        server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
-        DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().saveModel(server);
 
         try {
             Thread.sleep(500);
@@ -154,6 +154,9 @@ public class ServerManager {
             return false;
         }
 
+        server.setContainerId(containerId);
+        server.setUpdated_at(new Date(System.currentTimeMillis() + 300000));//add 5 minutes for server to start up
+        DoubleChest.INSTANCE.getMongoDatabase().getServerRepository().saveModel(server);
         return true;
     }
 

@@ -91,7 +91,12 @@ public class ServerManager {
         try {
             removeContainer(server);
         } catch (Exception e) {
-            log.error("Threw a Exception in ServerManager::createServer, full stack trace follows: ", e);
+            log.error("Could not create server on node " + node.getName() + ", attempting to start on another node");
+            final Node no = node;
+            server.setNode(null);
+
+            createServer(server, (n) -> n.getName().equals(no.getName()), 0);
+            redstone.getRaven().sendEvent(createEvent(e, node));
             return false;
         }
 
@@ -164,7 +169,7 @@ public class ServerManager {
         return new EventBuilder()
                 .withSentryInterface(new ExceptionInterface(e))
                 .withLevel(Event.Level.ERROR)
-                .withExtra("node", node.getName())
+                .withTag("node", node.getName())
                 .build();
     }
 
@@ -173,12 +178,14 @@ public class ServerManager {
 
         for (Container container : dockerClient.listContainersCmd().withShowAll(true).exec()) {
             String name = container.getNames()[0];
-            if (name.equals("/" + server.getServerType().getName() + "." + server.getNumber())) {
-                log.info("Deleting " + Arrays.toString(container.getNames()));
+            if (name == null || name.equals("/" + server.getServerType().getName() + "." + server.getNumber())) {
+                log.info("Deleting " + name == null ? container.getId() : Arrays.toString(container.getNames()));
+
                 try {
                     dockerClient.killContainerCmd(container.getId()).exec();
                 } catch (Exception ignored) {
                 }
+
                 dockerClient.removeContainerCmd(container.getId()).withForce(true).exec();
                 break;
             }

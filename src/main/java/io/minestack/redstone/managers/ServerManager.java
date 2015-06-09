@@ -177,9 +177,9 @@ public class ServerManager {
         DockerClient dockerClient = DockerClientBuilder.getInstance("http://" + server.getNode().getPrivateAddress() + ":4243").build();
 
         for (Container container : dockerClient.listContainersCmd().withShowAll(true).exec()) {
-            String name = container.getNames()[0];
+            String name = container.getNames() == null ? null : container.getNames()[0];
             if (name == null || name.equals("/" + server.getServerType().getName() + "." + server.getNumber())) {
-                log.info("Deleting " + name == null ? container.getId() : Arrays.toString(container.getNames()));
+                log.info("Deleting " + (name == null ? container.getId() : Arrays.toString(container.getNames())));
 
                 try {
                     dockerClient.killContainerCmd(container.getId()).exec();

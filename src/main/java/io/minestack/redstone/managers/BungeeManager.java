@@ -127,7 +127,8 @@ public class BungeeManager {
             String name = container.getNames() == null ? null : container.getNames()[0];
 
             if (name == null || name.equals("/" + bungee.getBungeeType().getName()+"."+bungee.getPublicAddress().getPublicAddress()) ||
-                    name.contains(bungee.getPublicAddress().getPublicAddress())) {
+                    name.contains(bungee.getPublicAddress().getPublicAddress()) ||
+                    container.getStatus() == null || container.getStatus().contains("Exited")) {
                 log.info("Deleting " + (name == null ? container.getId() : Arrays.toString(container.getNames())));
                 try {
                     dockerClient.killContainerCmd(container.getId()).exec();

@@ -178,7 +178,9 @@ public class ServerManager {
 
         for (Container container : dockerClient.listContainersCmd().withShowAll(true).exec()) {
             String name = container.getNames() == null ? null : container.getNames()[0];
-            if (name == null || name.equals("/" + server.getServerType().getName() + "." + server.getNumber())) {
+
+            if (name == null || name.equals("/" + server.getServerType().getName() + "." + server.getNumber()) ||
+                    container.getStatus() == null || container.getStatus().contains("Exited")) {
                 log.info("Deleting " + (name == null ? container.getId() : Arrays.toString(container.getNames())));
 
                 try {

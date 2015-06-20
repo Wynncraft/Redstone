@@ -79,7 +79,10 @@ public class BungeeManager {
                     .withEnv(env.toArray(new String[env.size()]))
                     .withName(bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress())
                     .withExposedPorts(new ExposedPort(25565, InternetProtocol.TCP))
-                    .withStdinOpen(true);
+                    .withStdinOpen(true)
+                    .withPublishAllPorts(true)
+                    .withPortBindings(new PortBinding(new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565), new ExposedPort(25565, InternetProtocol.TCP)))
+                    .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack")));
 
             cmd.getHostConfig().setPortBindings(new Ports(new ExposedPort(25565, InternetProtocol.TCP), new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565)));
             cmd.withHostName(bungee.getBungeeType().getName()+"."+bungee.getPublicAddress().getPublicAddress());
@@ -104,10 +107,7 @@ public class BungeeManager {
 
         log.info("Starting Docker Container for " + bungee.getBungeeType().getName() + "." + bungee.getPublicAddress().getPublicAddress()+ " for network " + bungee.getNetwork().getName()+ " on node "+bungee.getNode().getName());
         try {
-            dockerClient.startContainerCmd(containerId)
-                    .withPublishAllPorts(true)
-                    .withPortBindings(new PortBinding(new Ports.Binding(bungee.getPublicAddress().getPublicAddress(), 25565), new ExposedPort(25565, InternetProtocol.TCP)))
-                    .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
+            dockerClient.startContainerCmd(containerId).exec();
         } catch (Exception e) {
             if (times < 3) {
                 return createBungee(bungee, ++times);

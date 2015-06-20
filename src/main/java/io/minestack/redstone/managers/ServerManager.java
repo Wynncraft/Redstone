@@ -123,6 +123,8 @@ public class ServerManager {
                     .withName(server.getServerType().getName() + "." + server.getNumber())
                     .withStdinOpen(true)
                     .withHostName(server.getServerType().getName() + "." + server.getNumber())
+                    .withPublishAllPorts(true)
+                    .withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack")))
                     .exec();
         } catch (Exception e) {
             log.error("Could not create server on node " + node.getName() + ", attempting to start on another node");
@@ -144,7 +146,7 @@ public class ServerManager {
 
         log.info("Starting Docker Container for " + server.getServerType().getName() + "." + server.getNumber() + " for network " + server.getNetwork().getName());
         try {
-            dockerClient.startContainerCmd(containerId).withPublishAllPorts(true).withBinds(new Bind("/mnt/minestack", new Volume("/mnt/minestack"))).exec();
+            dockerClient.startContainerCmd(containerId).exec();
         } catch (Exception e) {
             if (times < 3) {
                 return createServer(server, (n) -> false, ++times);
